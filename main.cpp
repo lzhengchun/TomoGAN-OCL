@@ -16,7 +16,7 @@ using namespace std;
 
 // Use a static data size for simplicity
 #define IMG_SIZE    (1024)
-#define IMG_CH      (128)
+#define IMG_CH      (16)
 #define FILTER_SIZE (3)
 #define FILTER_DATA_SIZE (FILTER_SIZE * FILTER_SIZE * IMG_CH)
 #define INPUT_DATA_SIZE  (IMG_SIZE * IMG_SIZE * IMG_CH)
@@ -148,6 +148,17 @@ int main(int argc, char** argv)
     if (!kernel || err != CL_SUCCESS){
         printf("Error: Failed to create compute kernel! %d\n", err);
         exit(1);
+    }
+
+    size_t max_group_size;
+    // Get the maximum work group size for executing the kernel on the device
+    err = clGetKernelWorkGroupInfo(kernel, device_ids[dev_idx], CL_KERNEL_WORK_GROUP_SIZE, sizeof(max_group_size), &max_group_size, NULL);
+    if (err != CL_SUCCESS)
+    {
+        printf("Error: Failed to retrieve kernel work group info! %d\n", err);
+        exit(1);
+    }else{
+        printf("Max kernel work group size: %ld\n", max_group_size);
     }
 
     auto compile_ed = chrono::steady_clock::now();
