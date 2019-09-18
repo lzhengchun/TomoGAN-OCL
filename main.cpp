@@ -231,16 +231,18 @@ int main(int argc, char** argv)
     clReleaseCommandQueue(commands);
     clReleaseContext(context);
 
-    // for (size_t i = 0; i < 10; i++){
-    //     printf("%.4f ", results_h[222*IMG_SIZE + i]);
-    // }
-    // printf("\n");
-
-    for (size_t r = 0; r < IMG_SIZE; r++){
-        for (size_t c = 0; c < IMG_SIZE; c++){
-            printf("%6.2f ", results_h[r*IMG_SIZE + c]);
+    if(IMG_SIZE > 32){
+        for (size_t i = 0; i < 10; i++){
+            printf("%.4f ", results_h[222*IMG_SIZE + i]);
         }
         printf("\n");
+    }else{
+        for (size_t r = 0; r < IMG_SIZE; r++){
+            for (size_t c = 0; c < IMG_SIZE; c++){
+                printf("%6.2f ", results_h[r*IMG_SIZE + c]);
+            }
+            printf("\n");
+        }
     }
     
 
