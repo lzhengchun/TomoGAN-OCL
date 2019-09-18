@@ -27,7 +27,8 @@ __kernel void conv2d(__global float *input,
                 if(in_g_row >= height || in_g_col >= width || in_g_row < 0 || in_g_col < 0){
                     continue;
                 }
-                conv_res += input[width * height * kch + in_g_row * width + in_g_col] * \
+
+                conv_res += input[channel * width * krow + channel * kcol + kch] * \
                             filter_values[filter_size * filter_size * kch + filter_size * krow + kcol];
     }
     output_buf[row * width + col] = conv_res;
@@ -164,17 +165,17 @@ __kernel void conv2d_vec16_local(__global float16 *input,
     }
 
     float16 conv_res = (float16)(0.0);
-    conv_res += input_local[lrow][lcol]     * filter_values[0][0];
-    conv_res += input_local[lrow][lcol+1]   * filter_values[0][1];
-    conv_res += input_local[lrow][lcol+2]   * filter_values[0][2];
+    conv_res += input_local[lrow][lcol]     * filter_values[0];
+    conv_res += input_local[lrow][lcol+1]   * filter_values[1];
+    conv_res += input_local[lrow][lcol+2]   * filter_values[2];
 
-    conv_res += input_local[lrow+1][lcol]   * filter_values[1][0];
-    conv_res += input_local[lrow+1][lcol+1] * filter_values[1][1];
-    conv_res += input_local[lrow+1][lcol+2] * filter_values[1][2];
+    conv_res += input_local[lrow+1][lcol]   * filter_values[3];
+    conv_res += input_local[lrow+1][lcol+1] * filter_values[4];
+    conv_res += input_local[lrow+1][lcol+2] * filter_values[5];
 
-    conv_res += input_local[lrow+2][lcol]   * filter_values[2][0];
-    conv_res += input_local[lrow+2][lcol+1] * filter_values[2][1];
-    conv_res += input_local[lrow+2][lcol+2] * filter_values[2][2];
+    conv_res += input_local[lrow+2][lcol]   * filter_values[6];
+    conv_res += input_local[lrow+2][lcol+1] * filter_values[7];
+    conv_res += input_local[lrow+2][lcol+2] * filter_values[8];
 
     // output_buf[row * width + col] = 33;
     // return;

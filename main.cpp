@@ -15,13 +15,15 @@
 using namespace std;
 
 // Use a static data size for simplicity
-#define IMG_SIZE    (16)
+#define IMG_SIZE    (1024)
+#define IMG_WIDTH   IMG_SIZE
+#define IMG_HEIGHT  IMG_SIZE
 #define IMG_CH      (16)
 #define FILTER_SIZE (3)
 #define FILTER_DATA_SIZE (FILTER_SIZE * FILTER_SIZE * IMG_CH)
 #define INPUT_DATA_SIZE  (IMG_SIZE * IMG_SIZE * IMG_CH)
 #define OUTPUT_DATA_SIZE (IMG_SIZE * IMG_SIZE)
-#define MAX_SOURCE_SIZE (0x100000)
+#define MAX_SOURCE_SIZE (0x10000)
 
 int main(int argc, char** argv)
 {
@@ -39,8 +41,11 @@ int main(int argc, char** argv)
         filter_h[i] = 1; //rand() / (float)RAND_MAX;
     }
 
-    for(int i = 0; i < INPUT_DATA_SIZE; i++){
-        input_img_h[i] = 1; //rand() / (float)RAND_MAX;
+    for(int h = 0; h < IMG_SIZE; h++)
+        for(int w = 0; w < IMG_SIZE; w++)
+            for(int c = 0; c < IMG_CH; c++){
+                unsigned int gidx = IMG_CH * IMG_WIDTH * h + IMG_CH * w + c;
+                input_img_h[gidx] = c;
     }
     
     // Set up platform 
@@ -80,7 +85,7 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    unsigned int dev_idx = num_devices - 2;
+    unsigned int dev_idx = 0;//num_devices - 2;
 
     cl_ulong local_mem_size;
     clGetDeviceInfo(device_ids[dev_idx], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &local_mem_size, 0);
@@ -94,7 +99,7 @@ int main(int argc, char** argv)
     // Create a compute context 
     cl_context context = clCreateContext(0, 1, &(device_ids[dev_idx]), NULL, NULL, &err);
     if (!context){
-        printf("Error: Failed to create a compute context!\n");
+        printf("Error: Failed to create a compute context! %d\n", err);
         return EXIT_FAILURE;
     }
 
@@ -105,7 +110,7 @@ int main(int argc, char** argv)
         cl_command_queue commands = clCreateCommandQueueWithProperties(context, device_ids[dev_idx], 0, &err);
     #endif
     if (!commands){
-        printf("Error: Failed to create a command commands!\n");
+        printf("Error: Failed to create a command commands! %d\n", err);
         return EXIT_FAILURE;
     }
 
@@ -144,7 +149,7 @@ int main(int argc, char** argv)
     }
 
     // Create the compute kernel in the program we wish to run
-    cl_kernel kernel = clCreateKernel(program, "conv2d", &err);
+    cl_kernel kernel = clCreateKernel(program, "conv2d_vec16", &err);
     if (!kernel || err != CL_SUCCESS){
         printf("Error: Failed to create compute kernel! %d\n", err);
         exit(1);
@@ -233,19 +238,18 @@ int main(int argc, char** argv)
 
     if(IMG_SIZE > 32){
         for (size_t i = 0; i < 10; i++){
-            printf("%.4f ", results_h[222*IMG_SIZE + i]);
+            printf("%.2f ", results_h[222*IMG_SIZE + i]);
         }
         printf("\n");
     }else{
         for (size_t r = 0; r < IMG_SIZE; r++){
             for (size_t c = 0; c < IMG_SIZE; c++){
-                printf("%6.2f ", results_h[r*IMG_SIZE + c]);
+                printf("%4.0f ", results_h[r*IMG_SIZE + c]);
             }
             printf("\n");
         }
     }
     
-
     float res_sum = 0;
     for (size_t i = 0; i < OUTPUT_DATA_SIZE; i++){
         res_sum += results_h[i];
