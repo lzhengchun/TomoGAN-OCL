@@ -15,7 +15,7 @@
 using namespace std;
 
 // Use a static data size for simplicity
-#define IMG_SIZE    (1024)
+#define IMG_SIZE    (16)
 #define IMG_CH      (16)
 #define FILTER_SIZE (3)
 #define FILTER_DATA_SIZE (FILTER_SIZE * FILTER_SIZE * IMG_CH)
@@ -80,7 +80,7 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    unsigned int dev_idx = num_devices - 1;
+    unsigned int dev_idx = num_devices - 2;
 
     cl_ulong local_mem_size;
     clGetDeviceInfo(device_ids[dev_idx], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &local_mem_size, 0);
@@ -139,7 +139,7 @@ int main(int argc, char** argv)
         char buffer[2048];
         printf("Error: Failed to build program executable!: %d\n", err);
         clGetProgramBuildInfo(program, device_ids[dev_idx], CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
-        printf("%s\n", buffer);
+        printf("build error: %s\n", buffer);
         exit(1);
     }
 
@@ -231,10 +231,18 @@ int main(int argc, char** argv)
     clReleaseCommandQueue(commands);
     clReleaseContext(context);
 
-    for (size_t i = 0; i < 10; i++){
-        printf("%.4f ", results_h[222*IMG_SIZE + i]);
+    // for (size_t i = 0; i < 10; i++){
+    //     printf("%.4f ", results_h[222*IMG_SIZE + i]);
+    // }
+    // printf("\n");
+
+    for (size_t r = 0; r < IMG_SIZE; r++){
+        for (size_t c = 0; c < IMG_SIZE; c++){
+            printf("%6.2f ", results_h[r*IMG_SIZE + c]);
+        }
+        printf("\n");
     }
-    printf("\n");
+    
 
     float res_sum = 0;
     for (size_t i = 0; i < OUTPUT_DATA_SIZE; i++){
