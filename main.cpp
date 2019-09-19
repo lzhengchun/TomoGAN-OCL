@@ -85,7 +85,7 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    unsigned int dev_idx = 0;//num_devices - 2;
+    unsigned int dev_idx = 0;
 
     cl_ulong local_mem_size;
     clGetDeviceInfo(device_ids[dev_idx], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &local_mem_size, 0);
@@ -149,7 +149,7 @@ int main(int argc, char** argv)
     }
 
     // Create the compute kernel in the program we wish to run
-    cl_kernel kernel = clCreateKernel(program, "conv2d_vec16", &err);
+    cl_kernel kernel = clCreateKernel(program, "conv2d", &err);
     if (!kernel || err != CL_SUCCESS){
         printf("Error: Failed to create compute kernel! %d\n", err);
         exit(1);
