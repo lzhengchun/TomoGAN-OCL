@@ -237,3 +237,31 @@ __kernel void maxpooling2d(__global float   *input,
         output[width * row * channel + col * channel + ch] = pixel;
     }
 }
+
+// only support last axis cat
+__kernel void concatenate(__global float   *input1,
+                          __global float   *input2,
+                           const unsigned int height,
+                           const unsigned int width,
+                           const unsigned int channel1,
+                           const unsigned int channel2,
+                           __global float    *output){
+
+    int row = get_global_id(0);
+    int col = get_global_id(1);
+    if(row >= height || col >= width){
+        return;
+    }
+
+    size_t output_channel = channel1 + channel2;
+    unsigned out_base_idx = width * output_channel * row + output_channel * col;
+    unsigned in_base_idx  = width * channel1 * row + channel1 * col;
+    for(unsigned int ch = 0; ch < channel1; ch++){
+        output[out_base_idx + ch] = input1[in_base_idx + ch];
+    }
+
+    in_base_idx = width * channel2 * row + channel2 * col;
+    for(unsigned int ch = 0; ch < channel2; ch++){
+        output[out_base_idx + channel1 + ch] = input2[in_base_idx + ch];
+    }
+}
