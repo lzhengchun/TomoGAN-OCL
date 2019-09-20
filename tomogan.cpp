@@ -33,14 +33,27 @@ int main(int argc, char** argv)
 
     cl_mem conv_kernels_d[16];
     float* conv_kernels_h[16];
-    const unsigned int conv_ch[16] = {IMG_CH, 8, 32, 32, 32, 64, 128, 128, 256, 64, 128, 32, 64, 32, 32, 16};
+    //                                   0    1   2   3   4   5    6    7    8    9   10   11  12  13  14  15
+    const unsigned int conv_ch[16] = {IMG_CH, 8,  32, 32, 64,  64, 128, 128, 256, 64, 128, 32, 64, 32, 32, 16};
+    const unsigned int  n_conv[16] = {8,      32, 32, 64, 64, 128, 128, 128,  64, 64, 32,  32, 32, 32, 16, 1};
+    // const unsigned int conv_ch[16] = {IMG_CH, 8,  32, 32, 64, 64,  128, 128, 256, 128, 192, 64, 96, 32, 32, 16};
+    // const unsigned int  n_conv[16] = {8,      32, 32, 64, 64, 128, 128, 128, 128, 128, 64,  64, 32, 32, 16, 1};
     const unsigned int conv_sz[16] = {1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1};
 
+    std::ifstream fin("../../tomogan_weights_sterilize.bin", std::ios::binary);
+    unsigned int total_params = 0;
     for(int i = 0; i < 16; i++){
-        int buf_size = sizeof(float) * conv_sz[i] * conv_sz[i] * conv_ch[i];
+        unsigned int n_weights = (conv_sz[i] * conv_sz[i] * conv_ch[i] * n_conv[i]);
+        unsigned int buf_size = sizeof(float) * n_weights;
+        total_params += n_weights;
+        printf("%6d paras for conv2d_%02d kernel in_ch: %3d, no_ch: %3d\n", n_weights, i, conv_ch[i], n_conv[i]);
         conv_kernels_h[i] = new float[buf_size]();
-        // TODO: code to load weights
+
+        for (size_t inc_idx = 0; inc_idx < n_weights; inc_idx++){
+            fin.read(reinterpret_cast<char*>(conv_kernels_h[i]+inc_idx), sizeof(float));
+        }
     }
+    printf("Total params: %d\n", total_params);
     
     float *results_h   = new float[IMG_SIZE*IMG_SIZE]();  // results returned from device
 
