@@ -265,3 +265,32 @@ __kernel void concatenate(__global float   *input1,
         output[out_base_idx + channel1 + ch] = input2[in_base_idx + ch];
     }
 }
+
+// only support last axis cat and channls must be times of 16
+__kernel void concatenate_vec16(__global float16   *input1,
+                                __global float16   *input2,
+                                const unsigned int height,
+                                const unsigned int width,
+                                const unsigned int channel1,
+                                const unsigned int channel2,
+                                __global float16    *output){
+
+    int row = get_global_id(0);
+    int col = get_global_id(1);
+    if(row >= height || col >= width){
+        return;
+    }
+    size_t ch1_vec = channel1 / 16;
+    size_t ch2_vec = channel2 / 16;
+    size_t cho_vec = ch1_vec + ch2_vec;
+    unsigned out_base_idx = width * cho_vec * row + cho_vec * col;
+    unsigned in_base_idx  = width * ch1_vec * row + ch1_vec * col;
+    for(unsigned int ch = 0; ch < ch1_vec; ch++){
+        output[out_base_idx + ch] = input1[in_base_idx + ch];
+    }
+
+    in_base_idx = width * ch2_vec * row + ch2_vec * col;
+    for(unsigned int ch = 0; ch < ch2_vec; ch++){
+        output[out_base_idx + ch1_vec + ch] = input2[in_base_idx + ch];
+    }
+}

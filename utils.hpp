@@ -1,3 +1,6 @@
+#include <iostream>
+#include <cstdint>
+#include <cstring>
 
 void upsample_cpu(float *input,
                   const unsigned int height,
@@ -33,10 +36,10 @@ void concatenate(float *input1,
     unsigned int channel_out = channel1 + channel2;
     for (int r = 0; r < height; ++r)
         for (int c = 0; c < width; ++c){
-            memcpy(output + channel_out * width * r + channel_out * c, \
+            std::memcpy(output + channel_out * width * r + channel_out * c, \
                    input1 + channel1 * width * r + channel1 * c, sizeof(float) * channel1);
 
-            memcpy(output + channel_out * width * r + channel_out * c + channel1, \
+            std::memcpy(output + channel_out * width * r + channel_out * c + channel1, \
                    input2 + channel2 * width * r + channel2 * c, sizeof(float) * channel2);
         }
 }

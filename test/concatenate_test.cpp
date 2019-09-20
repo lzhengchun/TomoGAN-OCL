@@ -18,8 +18,8 @@ using namespace std;
 #define IMG_SIZE    (512)
 #define IMG_WIDTH   IMG_SIZE
 #define IMG_HEIGHT  IMG_SIZE
-#define IMG_CH1     (128)
-#define IMG_CH2     (128)
+#define IMG_CH1     (64)
+#define IMG_CH2     (64)
 #define IMG_CH_OUT  (IMG_CH1 + IMG_CH2)
 #define IMG1_SIZE   (IMG_SIZE * IMG_SIZE * IMG_CH1)
 #define IMG2_SIZE   (IMG_SIZE * IMG_SIZE * IMG_CH2)
@@ -58,7 +58,7 @@ int main(int argc, char** argv){
     auto start_cpu = chrono::steady_clock::now();
     concatenate(input_img1_h, input_img2_h, img_height, img_width, img_channel1, img_channel2, results_h);
     auto end_cpu = chrono::steady_clock::now();
-    printf("It takes %.3f ms to concatenate using CPU\n", \
+    printf("It takes %.3f ms to concatenate using CPU (exclude data transfer)\n", \
            chrono::duration_cast<chrono::microseconds>(end_cpu - start_cpu).count()/1000.);
 
     // Set up platform 
@@ -162,7 +162,7 @@ int main(int argc, char** argv){
     }
 
     // Create the compute kernel in the program we wish to run
-    cl_kernel kernel = clCreateKernel(program, "concatenate", &err);
+    cl_kernel kernel = clCreateKernel(program, "concatenate_vec16", &err);
     if (!kernel || err != CL_SUCCESS){
         printf("Error: Failed to create compute kernel! %d\n", err);
         exit(1);
@@ -229,14 +229,15 @@ int main(int argc, char** argv){
             return EXIT_FAILURE;
         }
         clFinish(commands);
-
-        // Read back the results from the device 
-        // err = clEnqueueReadBuffer(commands, out_img_d, CL_TRUE, 0, sizeof(float) * OUTPUT_DATA_SIZE, results_h, 0, NULL, NULL );  
-        if (err != CL_SUCCESS){
-            printf("Error: Failed to read output array! %d\n", err);
-            exit(1);
-        }
     }
+    
+    // Read back the results from the device 
+    err = clEnqueueReadBuffer(commands, out_img_d, CL_TRUE, 0, sizeof(float) * OUTPUT_DATA_SIZE, results_h, 0, NULL, NULL );  
+    if (err != CL_SUCCESS){
+        printf("Error: Failed to read output array! %d\n", err);
+        exit(1);
+    }
+
     auto end = chrono::steady_clock::now();
     printf("It takes %.3f ms to compute using GPU\n", \
            chrono::duration_cast<chrono::microseconds>(end - start).count()/1000./(n_reps-5));
@@ -275,11 +276,11 @@ int main(int argc, char** argv){
     //     }
     // }
 
-    float res_sum = 0;
+    double res_sum = 0;
     for (size_t i = 0; i < OUTPUT_DATA_SIZE; i++){
         res_sum += results_h[i];
     }
-    printf("sum of output: %f\n", res_sum);
+    printf("sum of output: %lf\n", res_sum);
 
     delete[] results_h;
     delete[] input_img1_h;
