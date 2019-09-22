@@ -154,6 +154,8 @@ __kernel void conv2d_vec16_mk0(__global float16 *input,
             if(in_g_row >= height || in_g_col >= width || in_g_row < 0 || in_g_col < 0){
                 continue;
             }
+            // you saved global member access of input data but needs to do more reduction and 
+            // global memory access to output buffer
             for(unsigned int batch = 0; batch < channls_to_16; batch++){
                 in_tmp = input[width * channls_to_16 * in_g_row + channls_to_16 * in_g_col + batch];
                 for(unsigned int kf = 0; kf < num_filter; kf++){
