@@ -4,6 +4,8 @@
 #include <math.h>
 #include <chrono>
 
+#include "main.hpp"
+
 #ifdef __APPLE__
     #define CL_SILENCE_DEPRECATION 
     #include <OpenCL/opencl.h>
@@ -19,6 +21,7 @@ using namespace std;
 #define IMG_WIDTH   IMG_SIZE
 #define IMG_HEIGHT  IMG_SIZE
 #define IMG_CH      (3)
+#define INPUT_SIZE  (IMG_SIZE * IMG_SIZE * IMG_CH)
 #define FILTER_SIZE (3)
 #define BOX1_IMG_SIZE (IMG_SIZE)
 #define BOX2_IMG_SIZE (IMG_SIZE/2)
@@ -30,7 +33,7 @@ using namespace std;
 int main(int argc, char** argv)
 {
     int err;                            // error code returned from api calls
-
+    float* input_h = new float[INPUT_SIZE]();
     cl_mem conv_kernels_d[16];
     float* conv_kernels_h[16];
     //                                   0    1   2   3   4   5    6    7    8    9   10   11  12  13  14  15
@@ -48,7 +51,7 @@ int main(int argc, char** argv)
         total_params += n_weights;
         printf("%6d paras for conv2d_%02d kernel in_ch: %3d, no_ch: %3d\n", n_weights, i, conv_ch[i], n_conv[i]);
         conv_kernels_h[i] = new float[buf_size]();
-
+        // load weights to host memory
         for (size_t inc_idx = 0; inc_idx < n_weights; inc_idx++){
             fin.read(reinterpret_cast<char*>(conv_kernels_h[i]+inc_idx), sizeof(float));
         }
@@ -158,21 +161,20 @@ int main(int argc, char** argv)
     }
 
     // Create the compute kernel in the program we wish to run
-    cl_kernel kernel = clCreateKernel(program, "conv2d", &err);
-    if (!kernel || err != CL_SUCCESS){
-        printf("Error: Failed to create compute kernel! %d\n", err);
+    cl_kernel kernel_conv2d = clCreateKernel(program, "conv2d", &err);
+    if (!kernel_conv2d || err != CL_SUCCESS){
+        printf("Error: Failed to create conv2d kernel! %d\n", err);
         exit(1);
     }
-
-    size_t max_group_size;
-    // Get the maximum work group size for executing the kernel on the device
-    err = clGetKernelWorkGroupInfo(kernel, device_ids[dev_idx], CL_KERNEL_WORK_GROUP_SIZE, sizeof(max_group_size), &max_group_size, NULL);
-    if (err != CL_SUCCESS)
-    {
-        printf("Error: Failed to retrieve kernel work group info! %d\n", err);
+    cl_kernel kernel_pool = clCreateKernel(program, "maxpooling2d", &err);
+    if (!kernel_pool || err != CL_SUCCESS){
+        printf("Error: Failed to create maxpooling2d kernel! %d\n", err);
         exit(1);
-    }else{
-        printf("Max kernel work group size: %ld\n", max_group_size);
+    }
+    cl_kernel kernel_upsample = clCreateKernel(program, "upsample2d", &err);
+    if (!kernel_upsample || err != CL_SUCCESS){
+        printf("Error: Failed to create upsample2d kernel! %d\n", err);
+        exit(1);
     }
 
     auto compile_ed = chrono::steady_clock::now();
@@ -180,21 +182,30 @@ int main(int argc, char** argv)
            chrono::duration_cast<chrono::microseconds>(compile_ed - compile_st).count()/1000.);
 
     // Create the input and output arrays in device memory for our calculation
-    cl_mem input_d  = clCreateBuffer(context, CL_MEM_READ_ONLY,   sizeof(float) * IMG_SIZE * IMG_SIZE * IMG_CH, NULL, NULL);
-    cl_mem layer_buf= clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * IMG_SIZE * IMG_SIZE * 32,     NULL, NULL);
-    cl_mem box1_out = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * BOX1_IMG_SIZE * BOX1_IMG_SIZE * 32,  NULL, NULL);
-    cl_mem box2_out = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * BOX2_IMG_SIZE * BOX2_IMG_SIZE * 64,  NULL, NULL);
-    cl_mem box3_out = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * BOX3_IMG_SIZE * BOX3_IMG_SIZE * 128, NULL, NULL);
-    cl_mem output_d = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(float) * IMG_SIZE * IMG_SIZE, NULL, NULL);
+    cl_mem input_d    = clCreateBuffer(context, CL_MEM_READ_ONLY,   sizeof(float) * INPUT_SIZE, NULL, NULL);
+    cl_mem layer_buf1 = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * IMG_SIZE * IMG_SIZE * 32,     NULL, NULL);
+    cl_mem layer_buf2 = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * IMG_SIZE * IMG_SIZE * 32,     NULL, NULL);
+    cl_mem box1_out   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * BOX1_IMG_SIZE * BOX1_IMG_SIZE * 32,  NULL, NULL);
+    cl_mem box2_out   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * BOX2_IMG_SIZE * BOX2_IMG_SIZE * 64,  NULL, NULL);
+    cl_mem box3_out   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * BOX3_IMG_SIZE * BOX3_IMG_SIZE * 128, NULL, NULL);
+    cl_mem output_d   = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(float) * IMG_SIZE * IMG_SIZE, NULL, NULL);
 
-    if (!input_d || !layer_buf || !box1_out || !box2_out || !box3_out || !output_d){
+    if (!input_d || !layer_buf1 || !layer_buf2 || !box1_out || !box2_out || !box3_out || !output_d){
         printf("Error: Failed to allocate device memory!\n");
         exit(1);
     }    
 
+    // transfer input data to device 
+    err = clEnqueueWriteBuffer(commands, input_d, CL_TRUE, 0, INPUT_SIZE, input_h, 0, NULL, NULL);  
+    if (err != CL_SUCCESS){
+        printf("Error occured when copy input data to device memory %d\n", err);
+        exit(1);
+    }
+
     // allocate device memory for model weights and copy weights to device
+    auto weights_cp_st = chrono::steady_clock::now();
     for(int i = 0; i < 16; i++){
-        int buf_size = sizeof(float) * conv_sz[i] * conv_sz[i] * conv_ch[i];
+        unsigned int buf_size = sizeof(float) * (conv_sz[i] * conv_sz[i] * conv_ch[i] * n_conv[i]);
         conv_kernels_d[i] = clCreateBuffer(context, CL_MEM_READ_ONLY, buf_size, NULL, NULL);
         if(!conv_kernels_d[i]){
             printf("Error: Failed to allocate device memory for kernel of layer %d!\n", i);
@@ -206,8 +217,35 @@ int main(int argc, char** argv)
             exit(1);
         }
     }
+    auto weights_cp_ed = chrono::steady_clock::now();
+    printf("It takes %.3f ms to transfer weights from host to device!\n", \
+           chrono::duration_cast<chrono::microseconds>(weights_cp_ed - weights_cp_st).count()/1000.);
 
     // start computing
+    auto comp_st = chrono::steady_clock::now();
+    size_t local[2] = {16, 16};
+    size_t global[2] = {IMG_SIZE, IMG_SIZE};
+    // layer 0
+    conv2d_set_arg(&kernel_conv2d, &input_d, IMG_SIZE, IMG_SIZE, IMG_CH, &conv_kernels_d[0], 1, &layer_buf1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    if (err){
+        printf("Error: Failed to execute kernel! %d\n", err);
+        return EXIT_FAILURE;
+    }
+    clFinish(commands);
+
+    // layer 1
+    conv2d_set_arg(&kernel_conv2d, &layer_buf1, IMG_SIZE, IMG_SIZE, IMG_CH, &conv_kernels_d[1], 3, &layer_buf2);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    if (err){
+        printf("Error: Failed to execute kernel! %d\n", err);
+        return EXIT_FAILURE;
+    }
+    clFinish(commands);
+
+    auto comp_ed = chrono::steady_clock::now();
+    printf("It takes %.3f ms to compute on device!\n", \
+           chrono::duration_cast<chrono::microseconds>(comp_ed - comp_st).count()/1000.);
 
     // Read back the results from the device 
     err = clEnqueueReadBuffer(commands, output_d, CL_TRUE, 0, sizeof(float) * IMG_SIZE * IMG_SIZE, results_h, 0, NULL, NULL );  
@@ -222,7 +260,8 @@ int main(int argc, char** argv)
         delete[] conv_kernels_h[i];
     }
     clReleaseMemObject(input_d);
-    clReleaseMemObject(layer_buf);
+    clReleaseMemObject(layer_buf1);
+    clReleaseMemObject(layer_buf2);
     clReleaseMemObject(box1_out);
     clReleaseMemObject(box2_out);
     clReleaseMemObject(box3_out);

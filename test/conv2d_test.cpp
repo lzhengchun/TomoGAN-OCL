@@ -4,6 +4,8 @@
 #include <math.h>
 #include <chrono>
 
+#include "../main.hpp"
+
 #ifdef __APPLE__
     #define CL_SILENCE_DEPRECATION 
     #include <OpenCL/opencl.h>
@@ -18,11 +20,12 @@ using namespace std;
 #define IMG_SIZE    (1024)
 #define IMG_WIDTH   IMG_SIZE
 #define IMG_HEIGHT  IMG_SIZE
-#define IMG_CH      (16)
+#define IMG_CH      (32)
 #define FILTER_SIZE (3)
-#define FILTER_DATA_SIZE (FILTER_SIZE * FILTER_SIZE * IMG_CH)
+#define NUM_FILTER  (32)
+#define FILTER_DATA_SIZE (FILTER_SIZE * FILTER_SIZE * IMG_CH * NUM_FILTER)
 #define INPUT_DATA_SIZE  (IMG_SIZE * IMG_SIZE * IMG_CH)
-#define OUTPUT_DATA_SIZE (IMG_SIZE * IMG_SIZE)
+#define OUTPUT_DATA_SIZE (IMG_SIZE * IMG_SIZE * NUM_FILTER)
 #define MAX_SOURCE_SIZE (0x10000)
 
 int main(int argc, char** argv)
@@ -35,10 +38,11 @@ int main(int argc, char** argv)
     unsigned int img_height  = IMG_SIZE;
     unsigned int img_channel = IMG_CH;
     unsigned int filter_size = FILTER_SIZE;
+    unsigned int num_filter  = NUM_FILTER;
 
     float filter_h[FILTER_DATA_SIZE];
     for(int i = 0; i < FILTER_DATA_SIZE; i++){
-        filter_h[i] = 1; //rand() / (float)RAND_MAX;
+        filter_h[i] = i % (FILTER_SIZE * FILTER_SIZE);
     }
 
     for(int h = 0; h < IMG_SIZE; h++)
@@ -120,9 +124,9 @@ int main(int argc, char** argv)
     char *source_str;
     size_t source_size;
  
-    fp = fopen("conv2d.cl", "r");
+    fp = fopen("../conv2d.cl", "r");
     if (!fp){
-        fprintf(stderr, "Failed to load kernel.\n");
+        fprintf(stderr, "Failed to load kernel file.\n");
         exit(1);
     }
     source_str = new char[MAX_SOURCE_SIZE]();
@@ -149,7 +153,7 @@ int main(int argc, char** argv)
     }
 
     // Create the compute kernel in the program we wish to run
-    cl_kernel kernel = clCreateKernel(program, "conv2d", &err);
+    cl_kernel kernel = clCreateKernel(program, "conv2d_vec16_mk", &err);
     if (!kernel || err != CL_SUCCESS){
         printf("Error: Failed to create compute kernel! %d\n", err);
         exit(1);
@@ -173,7 +177,7 @@ int main(int argc, char** argv)
     // Create the input and output arrays in device memory for our calculation
     cl_mem input_d  = clCreateBuffer(context, CL_MEM_READ_ONLY,  sizeof(float) * INPUT_DATA_SIZE, NULL, NULL);
     cl_mem filter_d = clCreateBuffer(context, CL_MEM_READ_ONLY,  sizeof(float) * FILTER_DATA_SIZE, NULL, NULL);
-    cl_mem output_d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * IMG_SIZE * IMG_SIZE, NULL, NULL);
+    cl_mem output_d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * OUTPUT_DATA_SIZE, NULL, NULL);
     if (!input_d || !output_d){
         printf("Error: Failed to allocate device memory!\n");
         exit(1);
@@ -195,6 +199,7 @@ int main(int argc, char** argv)
             exit(1);
         }
 
+        // conv2d_set_arg(&kernel, &input_d, img_height, img_width, img_channel, &filter_d, filter_size, &output_d);
         // Set the arguments to our compute kernel
         err  = 0;
         err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_d);
@@ -203,7 +208,8 @@ int main(int argc, char** argv)
         err |= clSetKernelArg(kernel, 3, sizeof(unsigned int), &img_channel);
         err |= clSetKernelArg(kernel, 4, sizeof(cl_mem), &filter_d);
         err |= clSetKernelArg(kernel, 5, sizeof(unsigned int), &filter_size);
-        err |= clSetKernelArg(kernel, 6, sizeof(cl_mem), &output_d);
+        err |= clSetKernelArg(kernel, 6, sizeof(unsigned int), &num_filter);
+        err |= clSetKernelArg(kernel, 7, sizeof(cl_mem), &output_d);
         if (err != CL_SUCCESS){
             printf("Error: Failed to set kernel arguments! %d\n", err);
             exit(1);
@@ -250,11 +256,11 @@ int main(int argc, char** argv)
         }
     }
     
-    float res_sum = 0;
+    double res_sum = 0;
     for (size_t i = 0; i < OUTPUT_DATA_SIZE; i++){
         res_sum += results_h[i];
     }
-    printf("sum of output: %f\n", res_sum);
+    printf("sum of output: %lf\n", res_sum);
 
     delete[] results_h;
     delete[] input_img_h;
