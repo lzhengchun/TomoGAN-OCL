@@ -20,9 +20,9 @@ using namespace std;
 #define IMG_SIZE    (1024)
 #define IMG_WIDTH   IMG_SIZE
 #define IMG_HEIGHT  IMG_SIZE
-#define IMG_CH      (32)
+#define IMG_CH      (16)
 #define FILTER_SIZE (3)
-#define NUM_FILTER  (32)
+#define NUM_FILTER  (4)
 #define FILTER_DATA_SIZE (FILTER_SIZE * FILTER_SIZE * IMG_CH * NUM_FILTER)
 #define INPUT_DATA_SIZE  (IMG_SIZE * IMG_SIZE * IMG_CH)
 #define OUTPUT_DATA_SIZE (IMG_SIZE * IMG_SIZE * NUM_FILTER)
@@ -42,7 +42,7 @@ int main(int argc, char** argv)
 
     float filter_h[FILTER_DATA_SIZE];
     for(int i = 0; i < FILTER_DATA_SIZE; i++){
-        filter_h[i] = i % (FILTER_SIZE * FILTER_SIZE);
+        filter_h[i] = i / (IMG_CH * FILTER_SIZE * FILTER_SIZE);
     }
 
     for(int h = 0; h < IMG_SIZE; h++)
@@ -215,6 +215,10 @@ int main(int argc, char** argv)
             exit(1);
         }
 
+        if(IMG_SIZE % 16){
+            printf("items in global_work_size must be perfectly dividable by corresponding items in local_work_size\n");
+            return EXIT_FAILURE;
+        }
         size_t local[2] = {16, 16};
         size_t global[2] = {IMG_SIZE, IMG_SIZE};
         err = clEnqueueNDRangeKernel(commands, kernel, 2, NULL, global, local, 0, NULL, NULL);
@@ -248,11 +252,14 @@ int main(int argc, char** argv)
         }
         printf("\n");
     }else{
-        for (size_t r = 0; r < IMG_SIZE; r++){
-            for (size_t c = 0; c < IMG_SIZE; c++){
-                printf("%4.0f ", results_h[r*IMG_SIZE + c]);
+        for (size_t ch = 0; ch < NUM_FILTER; ch++){
+            printf("Channl: %ld\n", ch);
+            for (size_t r = 0; r < IMG_SIZE; r++){
+                for (size_t c = 0; c < IMG_SIZE; c++){
+                    printf("%4.0f ", results_h[NUM_FILTER * IMG_SIZE * r + NUM_FILTER * c + ch]);
+                }
+                printf("\n");
             }
-            printf("\n");
         }
     }
     

@@ -113,8 +113,8 @@ __kernel void conv2d_vec16_mk(__global float16 *input,
                                                 channls_to_16 * kcol + batch];
                 }
         }
-        // output_buf[row * width + col] = dot(conv_res, (float16)(1));
-        output_buf[kf * width * height + row * width + col] = \
+        // output_buf[kf * width * height + row * width + col] = 
+        output_buf[num_filter * width * row + num_filter * col + kf] = \
             conv_res.s0 + conv_res.s1 + conv_res.s2 + conv_res.s3 + \
             conv_res.s4 + conv_res.s5 + conv_res.s6 + conv_res.s7 +\
             conv_res.s8 + conv_res.s9 + conv_res.sa + conv_res.sb +\
