@@ -122,56 +122,6 @@ __kernel void conv2d_vec16_mk(__global float16 *input,
     }
 }
 
-// it is worse than linear increase, it seems that what you saved from reading 
-// global memry is less then the cost of extra reduction operations
-__kernel void conv2d_vec16_mk0(__global float16 *input,
-                     const unsigned int height,
-                     const unsigned int width,
-                     const unsigned int channel,
-                     __constant float16 *filter_values,
-                     const unsigned int filter_size,
-                     const unsigned int num_filter,
-                     __global float *output_buf){
-    int row = get_global_id(0);
-    int col = get_global_id(1);
-    if(row >= height || col >= width){
-        return;
-    }
-    const unsigned int half_filter_size = filter_size/2;
-    const unsigned int gr2l_off = row - half_filter_size;
-    const unsigned int gc2l_off = col - half_filter_size;
-    const unsigned int channls_to_16 = channel / 16;
-    for(unsigned int kf = 0; kf < num_filter; kf++){
-        output_buf[kf * width * height + row * width + col] = 0;
-    }
-    unsigned int in_g_row, in_g_col;
-    const unsigned int filter_value_size_to_16 = filter_size * filter_size * channls_to_16;
-    float16 in_tmp, conv_res = (float16)(0.0);
-    for(unsigned int krow = 0; krow < filter_size; krow++)
-        for(unsigned int kcol = 0; kcol < filter_size; kcol++){
-            in_g_row = gr2l_off + krow;
-            in_g_col = gc2l_off + kcol;
-            if(in_g_row >= height || in_g_col >= width || in_g_row < 0 || in_g_col < 0){
-                continue;
-            }
-            // you saved global member access of input data but needs to do more reduction and 
-            // global memory access to output buffer
-            for(unsigned int batch = 0; batch < channls_to_16; batch++){
-                in_tmp = input[width * channls_to_16 * in_g_row + channls_to_16 * in_g_col + batch];
-                for(unsigned int kf = 0; kf < num_filter; kf++){
-                    conv_res = in_tmp * filter_values[filter_value_size_to_16 * kf + \
-                                                      filter_size * channls_to_16 * krow + \
-                                                      channls_to_16 * kcol + batch];
-                    output_buf[kf * width * height + row * width + col] += \
-                        conv_res.s0 + conv_res.s1 + conv_res.s2 + conv_res.s3 + \
-                        conv_res.s4 + conv_res.s5 + conv_res.s6 + conv_res.s7 +\
-                        conv_res.s8 + conv_res.s9 + conv_res.sa + conv_res.sb +\
-                        conv_res.sc + conv_res.sd + conv_res.se + conv_res.sf;                                                           
-                }
-            }
-        }
-}
-
 // HWC; stride = 1; padding = same; square filter
 // naive implementation using global memory
 #define BLOCK_DIM 16
