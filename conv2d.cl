@@ -1,6 +1,6 @@
 // HWC; stride = 1; padding = same; square filter
 // naive implementation using global memory
-__kernel void conv2d(__global float *input,
+__kernel void conv2d_naive(__global float *input,
                      const unsigned int height,
                      const unsigned int width,
                      const unsigned int channel,
@@ -33,8 +33,6 @@ __kernel void conv2d(__global float *input,
     }
     output_buf[row * width + col] = conv_res;
 }
-
-// __kernel void conv2d_3by3_vec16(__global float16 *input,
 
 // HWC; stride = 1; padding = same; square filter
 // naive implementation using global memory
@@ -84,7 +82,8 @@ __kernel void conv2d_vec16_mk(__global float16 *input,
                      __constant float16 *filter_values,
                      const unsigned int filter_size,
                      const unsigned int num_filter,
-                     __global float *output_buf){
+                     __global float *output_buf,
+                     const char relu){
     int row = get_global_id(0);
     int col = get_global_id(1);
     if(row >= height || col >= width){
@@ -113,12 +112,17 @@ __kernel void conv2d_vec16_mk(__global float16 *input,
                                                 channls_to_16 * kcol + batch];
                 }
         }
-        // output_buf[kf * width * height + row * width + col] = 
-        output_buf[num_filter * width * row + num_filter * col + kf] = \
+        float pixel_conv = \
             conv_res.s0 + conv_res.s1 + conv_res.s2 + conv_res.s3 + \
             conv_res.s4 + conv_res.s5 + conv_res.s6 + conv_res.s7 +\
             conv_res.s8 + conv_res.s9 + conv_res.sa + conv_res.sb +\
             conv_res.sc + conv_res.sd + conv_res.se + conv_res.sf;
+        if(relu != 0){
+            output_buf[num_filter * width * row + num_filter * col + kf] = fmax((float)0.0, pixel_conv);
+        } 
+        else{
+            output_buf[num_filter * width * row + num_filter * col + kf] = pixel_conv;
+        }
     }
 }
 

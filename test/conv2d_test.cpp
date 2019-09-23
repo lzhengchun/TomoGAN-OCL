@@ -199,21 +199,23 @@ int main(int argc, char** argv)
             exit(1);
         }
 
-        // conv2d_set_arg(&kernel, &input_d, img_height, img_width, img_channel, &filter_d, filter_size, &output_d);
+        unsigned char apply_relu = 1;
+        conv2d_set_arg(&kernel, &input_d, img_height, img_width, img_channel, &filter_d, filter_size, num_filter,  &output_d, apply_relu);
         // Set the arguments to our compute kernel
-        err  = 0;
-        err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_d);
-        err |= clSetKernelArg(kernel, 1, sizeof(unsigned int), &img_height);
-        err |= clSetKernelArg(kernel, 2, sizeof(unsigned int), &img_width);
-        err |= clSetKernelArg(kernel, 3, sizeof(unsigned int), &img_channel);
-        err |= clSetKernelArg(kernel, 4, sizeof(cl_mem), &filter_d);
-        err |= clSetKernelArg(kernel, 5, sizeof(unsigned int), &filter_size);
-        err |= clSetKernelArg(kernel, 6, sizeof(unsigned int), &num_filter);
-        err |= clSetKernelArg(kernel, 7, sizeof(cl_mem), &output_d);
-        if (err != CL_SUCCESS){
-            printf("Error: Failed to set kernel arguments! %d\n", err);
-            exit(1);
-        }
+        // err  = 0;
+        // err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_d);
+        // err |= clSetKernelArg(kernel, 1, sizeof(unsigned int), &img_height);
+        // err |= clSetKernelArg(kernel, 2, sizeof(unsigned int), &img_width);
+        // err |= clSetKernelArg(kernel, 3, sizeof(unsigned int), &img_channel);
+        // err |= clSetKernelArg(kernel, 4, sizeof(cl_mem), &filter_d);
+        // err |= clSetKernelArg(kernel, 5, sizeof(unsigned int), &filter_size);
+        // err |= clSetKernelArg(kernel, 6, sizeof(unsigned int), &num_filter);
+        // err |= clSetKernelArg(kernel, 7, sizeof(cl_mem), &output_d);
+        // err |= clSetKernelArg(kernel, 8, sizeof(unsigned char), &apply_relu);
+        // if (err != CL_SUCCESS){
+        //     printf("Error: Failed to set kernel arguments! %d\n", err);
+        //     exit(1);
+        // }
 
         if(IMG_SIZE % 16){
             printf("items in global_work_size must be perfectly dividable by corresponding items in local_work_size\n");
