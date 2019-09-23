@@ -17,12 +17,12 @@
 using namespace std;
 
 // Use a static data size for simplicity
-#define IMG_SIZE    (1024)
+#define IMG_SIZE    (64)
 #define IMG_WIDTH   IMG_SIZE
 #define IMG_HEIGHT  IMG_SIZE
-#define IMG_CH      (16)
+#define IMG_CH      (32)
 #define FILTER_SIZE (3)
-#define NUM_FILTER  (4)
+#define NUM_FILTER  (64)
 #define FILTER_DATA_SIZE (FILTER_SIZE * FILTER_SIZE * IMG_CH * NUM_FILTER)
 #define INPUT_DATA_SIZE  (IMG_SIZE * IMG_SIZE * IMG_CH)
 #define OUTPUT_DATA_SIZE (IMG_SIZE * IMG_SIZE * NUM_FILTER)

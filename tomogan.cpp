@@ -26,7 +26,7 @@ using namespace std;
 #define BOX1_IMG_SIZE (IMG_SIZE)
 #define BOX2_IMG_SIZE (IMG_SIZE/2)
 #define BOX3_IMG_SIZE (IMG_SIZE/4)
-#define BOX4_IMG_SIZE (IMG_SIZE/8)
+#define INTR_IMG_SIZE (IMG_SIZE/8)
 
 #define MAX_SOURCE_SIZE (0x10000)
 
@@ -161,14 +161,24 @@ int main(int argc, char** argv)
     }
 
     // Create the compute kernel in the program we wish to run
-    cl_kernel kernel_conv2d = clCreateKernel(program, "conv2d", &err);
+    cl_kernel kernel_conv2d = clCreateKernel(program, "conv2d_vec16_mk", &err);
     if (!kernel_conv2d || err != CL_SUCCESS){
-        printf("Error: Failed to create conv2d kernel! %d\n", err);
+        printf("Error: Failed to create conv2d-v16 kernel! %d\n", err);
+        exit(1);
+    }
+    cl_kernel kernel_conv2d_v8 = clCreateKernel(program, "conv2d_vec8_mk", &err);
+    if (!kernel_conv2d_v8 || err != CL_SUCCESS){
+        printf("Error: Failed to create conv2d-v8 kernel! %d\n", err);
         exit(1);
     }
     cl_kernel kernel_pool = clCreateKernel(program, "maxpooling2d", &err);
     if (!kernel_pool || err != CL_SUCCESS){
         printf("Error: Failed to create maxpooling2d kernel! %d\n", err);
+        exit(1);
+    }
+    cl_kernel kernel_concat = clCreateKernel(program, "concatenate", &err);
+    if (!kernel_concat || err != CL_SUCCESS){
+        printf("Error: Failed to create concat kernel! %d\n", err);
         exit(1);
     }
     cl_kernel kernel_upsample = clCreateKernel(program, "upsample2d", &err);
@@ -225,22 +235,155 @@ int main(int argc, char** argv)
     auto comp_st = chrono::steady_clock::now();
     size_t local[2] = {16, 16};
     size_t global[2] = {IMG_SIZE, IMG_SIZE};
-    // layer 0
-    conv2d_set_arg(&kernel_conv2d, &input_d, IMG_SIZE, IMG_SIZE, IMG_CH, &conv_kernels_d[0], 1, &layer_buf1);
-    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
-    if (err){
-        printf("Error: Failed to execute kernel! %d\n", err);
-        return EXIT_FAILURE;
-    }
+    // conv layer 0
+    // conv2d_set_arg(&kernel_conv2d, &input_d, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[0], &conv_kernels_d[0], 1, n_conv[0], &layer_buf1, 1);
+    // err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    // oclErrchk(err);
+    // clFinish(commands);
+
+    // conv layer 1
+    conv2d_set_arg(&kernel_conv2d_v8, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[1], &conv_kernels_d[1], 3, n_conv[1], &layer_buf2, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v8, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
     clFinish(commands);
 
-    // layer 1
-    conv2d_set_arg(&kernel_conv2d, &layer_buf1, IMG_SIZE, IMG_SIZE, IMG_CH, &conv_kernels_d[1], 3, &layer_buf2);
+    // conv layer 2
+    conv2d_set_arg(&kernel_conv2d, &layer_buf2, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[2], &conv_kernels_d[2], 3, n_conv[2], &box1_out, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
-    if (err){
-        printf("Error: Failed to execute kernel! %d\n", err);
-        return EXIT_FAILURE;
-    }
+    oclErrchk(err);
+    clFinish(commands);
+
+    // max pooling
+    maxpool_set_arg(&kernel_pool, &box1_out, BOX1_IMG_SIZE, BOX1_IMG_SIZE, n_conv[2], &layer_buf1);
+    err = clEnqueueNDRangeKernel(commands, kernel_pool, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 3
+    conv2d_set_arg(&kernel_conv2d, &layer_buf1, BOX2_IMG_SIZE, BOX2_IMG_SIZE, conv_ch[3], &conv_kernels_d[3], 3, n_conv[3], &layer_buf2, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 4
+    conv2d_set_arg(&kernel_conv2d, &layer_buf2, BOX2_IMG_SIZE, BOX2_IMG_SIZE, conv_ch[4], &conv_kernels_d[4], 3, n_conv[4], &box2_out, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // max pooling 1
+    maxpool_set_arg(&kernel_pool, &box2_out, BOX2_IMG_SIZE, BOX2_IMG_SIZE, n_conv[4], &layer_buf1);
+    err = clEnqueueNDRangeKernel(commands, kernel_pool, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 5
+    conv2d_set_arg(&kernel_conv2d, &layer_buf1, BOX3_IMG_SIZE, BOX3_IMG_SIZE, conv_ch[5], &conv_kernels_d[5], 3, n_conv[5], &layer_buf2, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 6
+    conv2d_set_arg(&kernel_conv2d, &layer_buf2, BOX3_IMG_SIZE, BOX3_IMG_SIZE, conv_ch[6], &conv_kernels_d[6], 3, n_conv[6], &box3_out, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // max pooling 2
+    maxpool_set_arg(&kernel_pool, &box3_out, BOX3_IMG_SIZE, BOX3_IMG_SIZE, n_conv[6], &layer_buf1);
+    err = clEnqueueNDRangeKernel(commands, kernel_pool, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 7
+    conv2d_set_arg(&kernel_conv2d, &layer_buf1, INTR_IMG_SIZE, INTR_IMG_SIZE, conv_ch[7], &conv_kernels_d[7], 3, n_conv[7], &layer_buf2, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // upsample 0
+    maxpool_set_arg(&kernel_upsample, &layer_buf2, INTR_IMG_SIZE, INTR_IMG_SIZE, n_conv[7], &layer_buf1);
+    err = clEnqueueNDRangeKernel(commands, kernel_upsample, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // concat 0
+    concat_set_arg(&kernel_concat, &box3_out, &layer_buf1, BOX3_IMG_SIZE, BOX3_IMG_SIZE, n_conv[6], n_conv[7], &layer_buf2);
+    err = clEnqueueNDRangeKernel(commands, kernel_concat, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 8
+    conv2d_set_arg(&kernel_conv2d, &layer_buf2, BOX3_IMG_SIZE, BOX3_IMG_SIZE, conv_ch[8], &conv_kernels_d[8], 3, n_conv[8], &layer_buf1, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 9
+    conv2d_set_arg(&kernel_conv2d, &layer_buf1, BOX3_IMG_SIZE, BOX3_IMG_SIZE, conv_ch[8], &conv_kernels_d[8], 3, n_conv[8], &layer_buf2, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // upsample 1
+    maxpool_set_arg(&kernel_upsample, &layer_buf2, BOX3_IMG_SIZE, BOX3_IMG_SIZE, n_conv[9], &layer_buf1);
+    err = clEnqueueNDRangeKernel(commands, kernel_upsample, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // concat 1
+    concat_set_arg(&kernel_concat, &box2_out, &layer_buf1, BOX2_IMG_SIZE, BOX2_IMG_SIZE, n_conv[4], n_conv[9], &layer_buf2);
+    err = clEnqueueNDRangeKernel(commands, kernel_concat, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 10
+    conv2d_set_arg(&kernel_conv2d, &layer_buf2, BOX2_IMG_SIZE, BOX2_IMG_SIZE, conv_ch[10], &conv_kernels_d[10], 3, n_conv[10], &layer_buf1, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 11
+    conv2d_set_arg(&kernel_conv2d, &layer_buf1, BOX2_IMG_SIZE, BOX2_IMG_SIZE, conv_ch[11], &conv_kernels_d[11], 3, n_conv[11], &layer_buf2, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+
+   // upsample 1
+    maxpool_set_arg(&kernel_upsample, &layer_buf2, BOX2_IMG_SIZE, BOX2_IMG_SIZE, n_conv[11], &layer_buf1);
+    err = clEnqueueNDRangeKernel(commands, kernel_upsample, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // concat 1
+    concat_set_arg(&kernel_concat, &box1_out, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, n_conv[2], n_conv[11], &layer_buf2);
+    err = clEnqueueNDRangeKernel(commands, kernel_concat, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 12
+    conv2d_set_arg(&kernel_conv2d, &layer_buf2, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[12], &conv_kernels_d[12], 3, n_conv[12], &layer_buf1, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 13
+    conv2d_set_arg(&kernel_conv2d, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[13], &conv_kernels_d[13], 3, n_conv[13], &layer_buf2, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 14
+    conv2d_set_arg(&kernel_conv2d, &layer_buf2, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[14], &conv_kernels_d[14], 1, n_conv[14], &layer_buf1, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
+
+    // conv layer 15
+    conv2d_set_arg(&kernel_conv2d, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[15], &conv_kernels_d[15], 1, n_conv[15], &layer_buf2, 0);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
     clFinish(commands);
 
     auto comp_ed = chrono::steady_clock::now();
@@ -249,11 +392,7 @@ int main(int argc, char** argv)
 
     // Read back the results from the device 
     err = clEnqueueReadBuffer(commands, output_d, CL_TRUE, 0, sizeof(float) * IMG_SIZE * IMG_SIZE, results_h, 0, NULL, NULL );  
-    if (err != CL_SUCCESS){
-        printf("Error: Failed to read output array! %d\n", err);
-        exit(1);
-    }
-
+    oclErrchk(err);
 
     for(int i = 0; i < 16; i++){
         clReleaseMemObject(conv_kernels_d[i]);
