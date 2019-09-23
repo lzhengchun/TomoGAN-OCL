@@ -174,6 +174,54 @@ __kernel void conv2d_vec8_mk(__global float8 *input,
         }
     }
 }
+
+__kernel void conv2d_vec3_mk(__global float3 *input,
+                     const unsigned int height,
+                     const unsigned int width,
+                     const unsigned int channel,
+                     __constant float3 *filter_values,
+                     const unsigned int filter_size,
+                     const unsigned int num_filter,
+                     __global float *output_buf,
+                     const char relu){
+    int row = get_global_id(0);
+    int col = get_global_id(1);
+    if(row >= height || col >= width){
+        return;
+    }
+    const unsigned int half_filter_size = filter_size/2;
+    const unsigned int gr2l_off = row - half_filter_size;
+    const unsigned int gc2l_off = col - half_filter_size;
+    const unsigned int channls_to_16 = channel / 16;
+
+    int in_g_row, in_g_col;
+    const unsigned int filter_value_size_to_16 = filter_size * filter_size * channls_to_16;
+    for(unsigned int kf = 0; kf < num_filter; kf++){
+        float3 conv_res = (float3)(0.0);
+        for(unsigned int krow = 0; krow < filter_size; krow++)
+            for(unsigned int kcol = 0; kcol < filter_size; kcol++){
+                in_g_row = gr2l_off + krow;
+                in_g_col = gc2l_off + kcol;
+                if(in_g_row >= height || in_g_col >= width || in_g_row < 0 || in_g_col < 0){
+                    continue;
+                }
+                for(unsigned int batch = 0; batch < channls_to_16; batch++){
+                    conv_res += input[width * channls_to_16 * in_g_row + channls_to_16 * in_g_col + batch] * \
+                                filter_values[kf * filter_value_size_to_16 + \
+                                                filter_size * channls_to_16 * krow + \
+                                                channls_to_16 * kcol + batch];
+                }
+        }
+        float pixel_conv = dot((float3)(1.0), conv_res);
+        if(relu != 0){
+            output_buf[num_filter * width * row + num_filter * col + kf] = fmax((float)0.0, pixel_conv);
+        } 
+        else{
+            output_buf[num_filter * width * row + num_filter * col + kf] = pixel_conv;
+        }
+    }
+}
+
 // HWC; stride = 1; padding = same; square filter
 // naive implementation using global memory
 #define BLOCK_DIM 16

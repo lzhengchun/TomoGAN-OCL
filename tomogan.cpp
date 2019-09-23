@@ -28,7 +28,7 @@ using namespace std;
 #define BOX3_IMG_SIZE (IMG_SIZE/4)
 #define INTR_IMG_SIZE (IMG_SIZE/8)
 
-#define MAX_SOURCE_SIZE (0x10000)
+#define MAX_SOURCE_SIZE (0x100000)
 
 int main(int argc, char** argv)
 {
@@ -171,6 +171,11 @@ int main(int argc, char** argv)
         printf("Error: Failed to create conv2d-v8 kernel! %d\n", err);
         exit(1);
     }
+    cl_kernel kernel_conv2d_v3 = clCreateKernel(program, "conv2d_vec3_mk", &err);
+    if (!kernel_conv2d_v3 || err != CL_SUCCESS){
+        printf("Error: Failed to create conv2d-v8 kernel! %d\n", err);
+        exit(1);
+    }
     cl_kernel kernel_pool = clCreateKernel(program, "maxpooling2d", &err);
     if (!kernel_pool || err != CL_SUCCESS){
         printf("Error: Failed to create maxpooling2d kernel! %d\n", err);
@@ -236,10 +241,10 @@ int main(int argc, char** argv)
     size_t local[2] = {16, 16};
     size_t global[2] = {IMG_SIZE, IMG_SIZE};
     // conv layer 0
-    // conv2d_set_arg(&kernel_conv2d, &input_d, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[0], &conv_kernels_d[0], 1, n_conv[0], &layer_buf1, 1);
-    // err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
-    // oclErrchk(err);
-    // clFinish(commands);
+    conv2d_set_arg(&kernel_conv2d_v3, &input_d, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[0], &conv_kernels_d[0], 1, n_conv[0], &layer_buf1, 1);
+    err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v3, 2, NULL, global, local, 0, NULL, NULL);
+    oclErrchk(err);
+    clFinish(commands);
 
     // conv layer 1
     conv2d_set_arg(&kernel_conv2d_v8, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[1], &conv_kernels_d[1], 3, n_conv[1], &layer_buf2, 1);
@@ -349,14 +354,13 @@ int main(int argc, char** argv)
     oclErrchk(err);
     clFinish(commands);
 
-
-   // upsample 1
+   // upsample 2
     maxpool_set_arg(&kernel_upsample, &layer_buf2, BOX2_IMG_SIZE, BOX2_IMG_SIZE, n_conv[11], &layer_buf1);
     err = clEnqueueNDRangeKernel(commands, kernel_upsample, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
     clFinish(commands);
 
-    // concat 1
+    // concat 2
     concat_set_arg(&kernel_concat, &box1_out, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, n_conv[2], n_conv[11], &layer_buf2);
     err = clEnqueueNDRangeKernel(commands, kernel_concat, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
