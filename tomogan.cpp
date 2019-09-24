@@ -263,145 +263,121 @@ int main(int argc, char** argv)
     conv2d_set_arg(&kernel_conv2d, &input_d, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[0], &conv_kernels_d[0], conv_sz[0], n_conv[0], &layer_buf1, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 1
     conv2d_set_arg(&kernel_conv2d_v8, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[1], &conv_kernels_d[1], conv_sz[1], n_conv[1], &layer_buf2, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v8, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 2
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf2, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[2], &conv_kernels_d[2], conv_sz[2], n_conv[2], &box1_out, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // max pooling
     maxpool_set_arg(&kernel_pool, &box1_out, BOX1_IMG_SIZE, BOX1_IMG_SIZE, n_conv[2], &layer_buf1);
     err = clEnqueueNDRangeKernel(commands, kernel_pool, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 3
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf1, BOX2_IMG_SIZE, BOX2_IMG_SIZE, conv_ch[3], &conv_kernels_d[3], conv_sz[3], n_conv[3], &layer_buf2, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 4
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf2, BOX2_IMG_SIZE, BOX2_IMG_SIZE, conv_ch[4], &conv_kernels_d[4], conv_sz[4], n_conv[4], &box2_out, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // max pooling 1
     maxpool_set_arg(&kernel_pool, &box2_out, BOX2_IMG_SIZE, BOX2_IMG_SIZE, n_conv[4], &layer_buf1);
     err = clEnqueueNDRangeKernel(commands, kernel_pool, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 5
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf1, BOX3_IMG_SIZE, BOX3_IMG_SIZE, conv_ch[5], &conv_kernels_d[5], conv_sz[5], n_conv[5], &layer_buf2, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 6
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf2, BOX3_IMG_SIZE, BOX3_IMG_SIZE, conv_ch[6], &conv_kernels_d[6], conv_sz[6], n_conv[6], &box3_out, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // max pooling 2
     maxpool_set_arg(&kernel_pool, &box3_out, BOX3_IMG_SIZE, BOX3_IMG_SIZE, n_conv[6], &layer_buf1);
     err = clEnqueueNDRangeKernel(commands, kernel_pool, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 7
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf1, INTR_IMG_SIZE, INTR_IMG_SIZE, conv_ch[7], &conv_kernels_d[7], conv_sz[7], n_conv[7], &layer_buf2, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // upsample 0
     maxpool_set_arg(&kernel_upsample, &layer_buf2, INTR_IMG_SIZE, INTR_IMG_SIZE, n_conv[7], &layer_buf1);
     err = clEnqueueNDRangeKernel(commands, kernel_upsample, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // concat 0
     concat_set_arg(&kernel_concat, &box3_out, &layer_buf1, BOX3_IMG_SIZE, BOX3_IMG_SIZE, n_conv[6], n_conv[7], &layer_buf2);
     err = clEnqueueNDRangeKernel(commands, kernel_concat, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 8
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf2, BOX3_IMG_SIZE, BOX3_IMG_SIZE, conv_ch[8], &conv_kernels_d[8], conv_sz[8], n_conv[8], &layer_buf1, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 9
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf1, BOX3_IMG_SIZE, BOX3_IMG_SIZE, conv_ch[9], &conv_kernels_d[9], conv_sz[9], n_conv[9], &layer_buf2, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // upsample 1
     maxpool_set_arg(&kernel_upsample, &layer_buf2, BOX3_IMG_SIZE, BOX3_IMG_SIZE, n_conv[9], &layer_buf1);
     err = clEnqueueNDRangeKernel(commands, kernel_upsample, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // concat 1
     concat_set_arg(&kernel_concat, &box2_out, &layer_buf1, BOX2_IMG_SIZE, BOX2_IMG_SIZE, n_conv[4], n_conv[9], &layer_buf2);
     err = clEnqueueNDRangeKernel(commands, kernel_concat, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 10
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf2, BOX2_IMG_SIZE, BOX2_IMG_SIZE, conv_ch[10], &conv_kernels_d[10], conv_sz[10], n_conv[10], &layer_buf1, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 11
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf1, BOX2_IMG_SIZE, BOX2_IMG_SIZE, conv_ch[11], &conv_kernels_d[11], conv_sz[11], n_conv[11], &layer_buf2, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
    // upsample 2
     maxpool_set_arg(&kernel_upsample, &layer_buf2, BOX2_IMG_SIZE, BOX2_IMG_SIZE, n_conv[11], &layer_buf1);
     err = clEnqueueNDRangeKernel(commands, kernel_upsample, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // concat 2
     concat_set_arg(&kernel_concat, &box1_out, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, n_conv[2], n_conv[11], &layer_buf2);
     err = clEnqueueNDRangeKernel(commands, kernel_concat, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 12
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf2, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[12], &conv_kernels_d[12], conv_sz[12], n_conv[12], &layer_buf1, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 13
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[13], &conv_kernels_d[13], conv_sz[13], n_conv[13], &layer_buf2, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 14
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf2, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[14], &conv_kernels_d[14], conv_sz[14], n_conv[14], &layer_buf1, 1);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
-    // clFinish(commands);
 
     // conv layer 15
     conv2d_set_arg(&kernel_conv2d_v16, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[15], &conv_kernels_d[15], conv_sz[15], n_conv[15], &output_d, 0);
