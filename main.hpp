@@ -48,7 +48,6 @@ void conv2d_set_arg(cl_kernel *kernel,
     }
 }
 
-
 void maxpool_set_arg(cl_kernel *kernel,
                     cl_mem *input_d,
                     unsigned int img_height,

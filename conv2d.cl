@@ -353,10 +353,10 @@ __kernel void upsample2d(__global float   *input,
     unsigned int uheight= 2 * height;
     for(unsigned int ch = 0; ch < channel; ch++){
         float pixel = input[width * row * channel + col * channel + ch];
-        output[uwidth * urow     * channel + ucol     * channel + ch] = pixel;  // [urow][ucol][ch] 
-        output[uwidth * (urow+1) * channel + ucol     * channel + ch] = pixel;  // [urow+1][ucol][ch] 
-        output[uwidth * urow     * channel + (ucol+1) * channel + ch] = pixel;  // [urow][ucol+1][ch]
-        output[uwidth * (urow+1) * channel + (ucol+1) * channel + ch] = pixel;  // [urow+1][ucol+1][ch]
+        output[uwidth * urow      * channel + ucol      * channel + ch] = pixel;  // [urow][ucol][ch] 
+        output[uwidth * (urow+1)  * channel + ucol      * channel + ch] = pixel;  // [urow+1][ucol][ch] 
+        output[uwidth * urow      * channel + (ucol+1)  * channel + ch] = pixel;  // [urow][ucol+1][ch]
+        output[uwidth * (urow+1)  * channel + (ucol+1)  * channel + ch] = pixel;  // [urow+1][ucol+1][ch]
     }
 }
 

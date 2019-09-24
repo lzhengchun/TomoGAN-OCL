@@ -17,10 +17,10 @@
 using namespace std;
 
 // Use a static data size for simplicity
-#define IMG_SIZE    (1024)
+#define IMG_SIZE    (512)
 #define IMG_WIDTH   IMG_SIZE
 #define IMG_HEIGHT  IMG_SIZE
-#define IMG_CH      (8)
+#define IMG_CH      (64)
 #define FILTER_SIZE (3)
 #define NUM_FILTER  (32)
 #define FILTER_DATA_SIZE (FILTER_SIZE * FILTER_SIZE * IMG_CH * NUM_FILTER)
@@ -42,7 +42,7 @@ int main(int argc, char** argv)
 
     float filter_h[FILTER_DATA_SIZE];
     for(int i = 0; i < FILTER_DATA_SIZE; i++){
-        filter_h[i] = i / (IMG_CH * FILTER_SIZE * FILTER_SIZE);
+        filter_h[i] = 1;//i / (IMG_CH * FILTER_SIZE * FILTER_SIZE);
     }
 
     for(int h = 0; h < IMG_SIZE; h++)
@@ -153,7 +153,7 @@ int main(int argc, char** argv)
     }
 
     // Create the compute kernel in the program we wish to run
-    cl_kernel kernel = clCreateKernel(program, "conv2d_mk", &err);
+    cl_kernel kernel = clCreateKernel(program, "conv2d_vec16_mk", &err);
     if (!kernel || err != CL_SUCCESS){
         printf("Error: Failed to create compute kernel! %d\n", err);
         exit(1);
@@ -200,7 +200,7 @@ int main(int argc, char** argv)
         }
 
         unsigned char apply_relu = 1;
-        conv2d_set_arg(&kernel, &input_d, img_height, img_width, img_channel, &filter_d, filter_size, num_filter,  &output_d, apply_relu);
+        conv2d_set_arg(&kernel, &input_d, img_height, img_width, img_channel, &filter_d, filter_size, num_filter, &output_d, apply_relu);
         // Set the arguments to our compute kernel
         // err  = 0;
         // err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input_d);
@@ -250,7 +250,7 @@ int main(int argc, char** argv)
 
     if(IMG_SIZE > 32){
         for (size_t i = 0; i < 10; i++){
-            printf("%.2f ", results_h[222*IMG_SIZE + i]);
+            printf("%.2f ", results_h[i]);
         }
         printf("\n");
     }else{
