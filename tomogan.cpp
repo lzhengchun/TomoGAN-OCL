@@ -22,7 +22,7 @@ using namespace std;
 #define IMG_HEIGHT  IMG_SIZE
 #define IMG_CH      (3)
 #define INPUT_SIZE  (IMG_SIZE * IMG_SIZE * IMG_CH)
-#define FILTER_SIZE (3)
+#define OUTPUT_SIZE (IMG_SIZE * IMG_SIZE)
 #define BOX1_IMG_SIZE (IMG_SIZE)
 #define BOX2_IMG_SIZE (IMG_SIZE/2)
 #define BOX3_IMG_SIZE (IMG_SIZE/4)
@@ -43,7 +43,7 @@ int main(int argc, char** argv)
     // const unsigned int  n_conv[16] = {8,      32, 32, 64, 64, 128, 128, 128, 128, 128, 64,  64, 32, 32, 16, 1};
     const unsigned int conv_sz[16] = {1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1};
 
-    std::ifstream fin("../../tomogan_weights_sterilize.bin", std::ios::binary);
+    std::ifstream weights_fin("tomogan_weights_sterilize.bin", std::ios::binary);
     unsigned int total_params = 0;
     for(int i = 0; i < 16; i++){
         unsigned int n_weights = (conv_sz[i] * conv_sz[i] * conv_ch[i] * n_conv[i]);
@@ -51,13 +51,25 @@ int main(int argc, char** argv)
         total_params += n_weights;
         printf("%6d paras for conv2d_%02d kernel in_ch: %3d, no_ch: %3d\n", n_weights, i, conv_ch[i], n_conv[i]);
         conv_kernels_h[i] = new float[buf_size]();
-        // load weights to host memory
-        for (size_t inc_idx = 0; inc_idx < n_weights; inc_idx++){
-            fin.read(reinterpret_cast<char*>(conv_kernels_h[i]+inc_idx), sizeof(float));
-        }
+        weights_fin.read((char *) conv_kernels_h[i], buf_size);
     }
-    printf("Total params: %d\n", total_params);
-    
+    weights_fin.close();
+    printf("Total params: %d, the last one: ", total_params);
+    for(int i = 0; i < 16; i++){
+        printf("%.3f ", conv_kernels_h[15][i]);
+    }
+    printf("\n");
+
+    std::ifstream inputs_fin("test_input_serilize.bin", std::ios::binary);
+    inputs_fin.read((char *) input_h, sizeof(float) * INPUT_SIZE);
+    inputs_fin.close();
+
+    printf("The first 16 pixels in the input: ", total_params);
+    for(int i = 0; i < 16; i++){
+        printf("%.0f ", input_h[i]);
+    }
+    printf("\n");
+
     float *results_h   = new float[IMG_SIZE*IMG_SIZE]();  // results returned from device
 
     // Set up platform 
@@ -203,7 +215,7 @@ int main(int argc, char** argv)
     cl_mem box1_out   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * BOX1_IMG_SIZE * BOX1_IMG_SIZE * 32,  NULL, NULL);
     cl_mem box2_out   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * BOX2_IMG_SIZE * BOX2_IMG_SIZE * 64,  NULL, NULL);
     cl_mem box3_out   = clCreateBuffer(context, CL_MEM_READ_WRITE,  sizeof(float) * BOX3_IMG_SIZE * BOX3_IMG_SIZE * 128, NULL, NULL);
-    cl_mem output_d   = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(float) * IMG_SIZE * IMG_SIZE, NULL, NULL);
+    cl_mem output_d   = clCreateBuffer(context, CL_MEM_WRITE_ONLY,  sizeof(float) * OUTPUT_SIZE, NULL, NULL);
 
     if (!input_d || !layer_buf1 || !layer_buf2 || !box1_out || !box2_out || !box3_out || !output_d){
         printf("Error: Failed to allocate device memory!\n");
@@ -211,11 +223,8 @@ int main(int argc, char** argv)
     }    
 
     // transfer input data to device 
-    err = clEnqueueWriteBuffer(commands, input_d, CL_TRUE, 0, INPUT_SIZE, input_h, 0, NULL, NULL);  
-    if (err != CL_SUCCESS){
-        printf("Error occured when copy input data to device memory %d\n", err);
-        exit(1);
-    }
+    err = clEnqueueWriteBuffer(commands, input_d, CL_TRUE, 0, sizeof(float) * INPUT_SIZE, input_h, 0, NULL, NULL);  
+    oclErrchk(err);
 
     // allocate device memory for model weights and copy weights to device
     auto weights_cp_st = chrono::steady_clock::now();
@@ -227,10 +236,7 @@ int main(int argc, char** argv)
             exit(1);
         }
         err = clEnqueueWriteBuffer(commands, conv_kernels_d[i], CL_TRUE, 0, buf_size, conv_kernels_h[i], 0, NULL, NULL);  
-        if (err != CL_SUCCESS){
-            printf("Error occured when copy conv kernel %d! %d\n", i+1, err);
-            exit(1);
-        }
+        oclErrchk(err);
     }
     auto weights_cp_ed = chrono::steady_clock::now();
     printf("It takes %.3f ms to transfer weights from host to device!\n", \
@@ -385,7 +391,7 @@ int main(int argc, char** argv)
     clFinish(commands);
 
     // conv layer 15
-    conv2d_set_arg(&kernel_conv2d_v16, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[15], &conv_kernels_d[15], 1, n_conv[15], &layer_buf2, 0);
+    conv2d_set_arg(&kernel_conv2d_v16, &layer_buf1, BOX1_IMG_SIZE, BOX1_IMG_SIZE, conv_ch[15], &conv_kernels_d[15], 1, n_conv[15], &output_d, 0);
     err = clEnqueueNDRangeKernel(commands, kernel_conv2d_v16, 2, NULL, global, local, 0, NULL, NULL);
     oclErrchk(err);
     clFinish(commands);
@@ -395,8 +401,13 @@ int main(int argc, char** argv)
            chrono::duration_cast<chrono::microseconds>(comp_ed - comp_st).count()/1000.);
 
     // Read back the results from the device 
-    err = clEnqueueReadBuffer(commands, output_d, CL_TRUE, 0, sizeof(float) * IMG_SIZE * IMG_SIZE, results_h, 0, NULL, NULL );  
+    err = clEnqueueReadBuffer(commands, output_d, CL_TRUE, 0, sizeof(float) * OUTPUT_SIZE, results_h, 0, NULL, NULL );  
     oclErrchk(err);
+
+    // dump output array to a file
+    std::ofstream img_fout("output_img.bin", std::ios::out | std::ios::binary);
+    img_fout.write((char *) results_h, sizeof(float) * OUTPUT_SIZE);
+    img_fout.close();
 
     for(int i = 0; i < 16; i++){
         clReleaseMemObject(conv_kernels_d[i]);
