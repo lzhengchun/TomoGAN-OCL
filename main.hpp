@@ -41,7 +41,8 @@ void conv2d_set_arg(cl_kernel *kernel,
     if (err != CL_SUCCESS){
         printf("Error: Failed to set kernel arguments for conv2d! %d\n", err);
         exit(1);
-    }else{
+    }
+    else{
         printf("Conv2d H:%4d, W:%4d, C:%3d, FS:%3d, NF:%3d, Relu:%1d\n", \
                img_height, img_width, img_channel, filter_size, num_filter, apply_relu);
     }

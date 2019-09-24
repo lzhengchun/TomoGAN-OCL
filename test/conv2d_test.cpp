@@ -17,12 +17,12 @@
 using namespace std;
 
 // Use a static data size for simplicity
-#define IMG_SIZE    (64)
+#define IMG_SIZE    (1024)
 #define IMG_WIDTH   IMG_SIZE
 #define IMG_HEIGHT  IMG_SIZE
-#define IMG_CH      (32)
+#define IMG_CH      (8)
 #define FILTER_SIZE (3)
-#define NUM_FILTER  (64)
+#define NUM_FILTER  (32)
 #define FILTER_DATA_SIZE (FILTER_SIZE * FILTER_SIZE * IMG_CH * NUM_FILTER)
 #define INPUT_DATA_SIZE  (IMG_SIZE * IMG_SIZE * IMG_CH)
 #define OUTPUT_DATA_SIZE (IMG_SIZE * IMG_SIZE * NUM_FILTER)
@@ -153,7 +153,7 @@ int main(int argc, char** argv)
     }
 
     // Create the compute kernel in the program we wish to run
-    cl_kernel kernel = clCreateKernel(program, "conv2d_vec16_mk", &err);
+    cl_kernel kernel = clCreateKernel(program, "conv2d_mk", &err);
     if (!kernel || err != CL_SUCCESS){
         printf("Error: Failed to create compute kernel! %d\n", err);
         exit(1);
@@ -183,7 +183,7 @@ int main(int argc, char** argv)
         exit(1);
     }    
 
-    const unsigned int n_reps = 105;
+    const unsigned int n_reps = 15;
     auto start = chrono::steady_clock::now();
     for (size_t rep_idx = 0; rep_idx < n_reps; rep_idx++){
         // ignore as warmup
